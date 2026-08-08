@@ -9,4 +9,21 @@
 	<UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Remove="Resources\app.png" />
+    <None Remove="Resources\Flags\en.png" />
+    <None Remove="Resources\Flags\es.png" />
+    <None Remove="Resources\Flags\fr.png" />
+    <None Remove="Resources\Flags\ru.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\app.png" />
+    <Resource Include="Resources\Flags\en.png" />
+    <Resource Include="Resources\Flags\es.png" />
+    <Resource Include="Resources\Flags\fr.png" />
+    <Resource Include="Resources\Flags\de.png" />
+    <Resource Include="Resources\Flags\ru.png" />
+  </ItemGroup>
+
 </Project>

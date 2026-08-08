@@ -275,7 +275,27 @@ namespace CS2ConfigSaver
         {
             var loc = CurrentLocale;
             AppTitleText.Text = loc.Title;
-            LangButton.Content = LanguageTags[_currentLanguageIndex];
+
+            // Массивы ресурсов флагов и текстовых меток
+            string[] flagPaths = {
+                "pack://application:,,,/Resources/Flags/en.png",
+                "pack://application:,,,/Resources/Flags/ru.png",
+                "pack://application:,,,/Resources/Flags/de.png",
+                "pack://application:,,,/Resources/Flags/fr.png",
+                "pack://application:,,,/Resources/Flags/es.png"
+            };
+            string[] langNames = { "EN", "RU", "DE", "FR", "ES" };
+
+            try
+            {
+                // Динамически загружаем картинку флага и меняем текст в кнопке
+                LangFlagImage.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(flagPaths[_currentLanguageIndex]));
+                LangText.Text = langNames[_currentLanguageIndex];
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load language icon: {ex.Message}");
+            }
 
             SaveConfigBtn.Content = loc.SaveBtn;
             LocateConfigsBtn.Content = loc.LocateBtn;

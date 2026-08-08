@@ -14,21 +14,35 @@
         {
             try
             {
-                // Отключаем аппаратное ускорение во избежание конфликта слоев AllowsTransparency
                 System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
 
                 _mainWindow = new MainWindow();
-
                 _notifyIcon = new Forms.NotifyIcon();
 
                 try
                 {
-                    // Безопасная попытка загрузки системной иконки
-                    _notifyIcon.Icon = System.Drawing.SystemIcons.Application;
+                    // Загружаем PNG из встроенных ресурсов утилиты
+                    var iconUri = new Uri("pack://application:,,,/Resources/app.png");
+                    var streamInfo = Application.GetResourceStream(iconUri);
+                    if (streamInfo != null)
+                    {
+                        // Читаем поток как Bitmap (стандартное представление PNG в .NET)
+                        using (var bitmap = new System.Drawing.Bitmap(streamInfo.Stream))
+                        {
+                            // Получаем Win32 дескриптор иконки из Bitmap
+                            IntPtr hIcon = bitmap.GetHicon();
+                            _notifyIcon.Icon = System.Drawing.Icon.FromHandle(hIcon);
+                        }
+                    }
+                    else
+                    {
+                        // Если файл не найден, используем стандартный значок Windows
+                        _notifyIcon.Icon = System.Drawing.SystemIcons.Application;
+                    }
                 }
                 catch
                 {
-                    // Если в ОС нет доступа к SystemIcons, используем пустую заглушку
+                    _notifyIcon.Icon = System.Drawing.SystemIcons.Application;
                 }
 
                 _notifyIcon.Visible = true;
