@@ -1,0 +1,126 @@
+﻿<Window x:Class="CS2ConfigSaver.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Config Saver" 
+        Height="430" Width="350"
+        WindowStyle="None"
+        Background="Transparent"
+        AllowsTransparency="True"
+        ShowInTaskbar="False"               
+        Topmost="True"                      
+        Deactivated="Window_Deactivated"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+
+    <!-- Добавляем этот блок для удаления системных рамок без багов прозрачности -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" 
+                      ResizeBorderThickness="5" 
+                      GlassFrameThickness="0" 
+                      CornerRadius="12"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <!-- Стили для кнопок -->
+        <Style x:Key="MenuButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#252528"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#323236"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#1F1F21"/>
+                    <Setter Property="Foreground" Value="#555555"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="#18181C" BorderBrush="#2D2D30" BorderThickness="1" CornerRadius="12">
+        <Grid Margin="15">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Шапка -->
+                <RowDefinition Height="*"/>
+                <!-- Контент -->
+                <RowDefinition Height="Auto"/>
+                <!-- Подвал (Путь сохранения) -->
+            </Grid.RowDefinitions>
+
+            <!-- ШАПКА -->
+            <Grid Grid.Row="0" Margin="0,0,0,10">
+                <TextBlock x:Name="AppTitleText" Text="Config Saver by DIWEST" Foreground="White" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <!-- Кнопка переключения языка -->
+                    <Button x:Name="LangButton" Content="🇺🇸 EN" Width="60" Height="26" Margin="0,0,5,0" Style="{StaticResource MenuButtonStyle}" Click="LangButton_Click"/>
+                    <!-- Кнопка помощи -->
+                    <Button Content="?" Width="26" Height="26" Style="{StaticResource MenuButtonStyle}" Click="Help_Click"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- КОНТЕНТ -->
+            <!-- 1. Главное меню -->
+            <Grid x:Name="MainMenuGrid" Grid.Row="1" Visibility="Visible">
+                <StackPanel VerticalAlignment="Center">
+                    <Button x:Name="SaveConfigBtn" Content="Save current config" Style="{StaticResource MenuButtonStyle}" Background="#0A3C15" Click="SaveConfigStart_Click"/>
+                    <Button x:Name="LocateConfigsBtn" Content="Locate saved configs" Style="{StaticResource MenuButtonStyle}" Click="LocateConfigs_Click"/>
+                    <Button x:Name="FindSteamBtn" Content="Find Steam Folders" Style="{StaticResource MenuButtonStyle}" Background="#1C3D5A" Click="FindSteamFolders_Click"/>
+                    <Button x:Name="AddConfigToGameBtn" Content="Add config to CS2" Style="{StaticResource MenuButtonStyle}" Background="#2B4C7E" Click="AddConfigToGame_Click"/>
+
+                    <TextBlock x:Name="SteamStatusText" Text="Steam path: not defined" Foreground="#888888" FontSize="11" TextWrapping="Wrap" Margin="0,5,0,0" HorizontalAlignment="Center"/>
+
+                    <Separator Background="#2D2D30" Margin="0,10"/>
+                    <Button x:Name="ExitBtn" Content="Exit" Style="{StaticResource MenuButtonStyle}" Background="#3A0A10" Click="Exit_Click"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- 2. Экран выбора аккаунта (если найдено несколько SteamID) -->
+            <Grid x:Name="SelectAccountGrid" Grid.Row="1" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="SelectSteamIdTitle" Grid.Row="0" Text="Select Steam ID:" Foreground="White" Margin="0,0,0,10"/>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="SteamIdsContainer"/>
+                </ScrollViewer>
+                <Button x:Name="BackBtn1" Grid.Row="2" Content="Back" Style="{StaticResource MenuButtonStyle}" Margin="0,10,0,0" Click="BackToMenu_Click"/>
+            </Grid>
+
+            <!-- 3. Экран ввода имени конфига -->
+            <Grid x:Name="SaveNameGrid" Grid.Row="1" Visibility="Collapsed">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="EnterConfigNameTitle" Text="Enter config name:" Foreground="White" Margin="0,0,0,5"/>
+                    <TextBox x:Name="ConfigNameInput" Height="35" Background="#252528" Foreground="White" BorderThickness="1" BorderBrush="#3F3F46" Padding="5" VerticalContentAlignment="Center" TextChanged="ConfigNameInput_TextChanged" PreviewTextInput="ConfigNameInput_PreviewTextInput"/>
+                    <TextBlock x:Name="OnlyLettersHint" Text="Only RU/EN letters" Foreground="#666666" FontSize="10" Margin="0,2,0,15"/>
+
+                    <Button x:Name="ConfirmSaveButton" Content="Save" Style="{StaticResource MenuButtonStyle}" Background="#0A3C15" Visibility="Collapsed" Click="ConfirmSave_Click"/>
+                    <Button x:Name="BackBtn2" Content="Back" Style="{StaticResource MenuButtonStyle}" Click="BackToMenu_Click"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- ПОДВАЛ (Путь сохранения резервных копий) -->
+            <Grid Grid.Row="2" Margin="0,10,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="BackupFolderTitle" Grid.Row="0" Text="Backup folder:" Foreground="#666666" FontSize="11" Margin="0,0,0,3"/>
+                <TextBox Grid.Row="1" x:Name="BackupPathInput" Height="28" Background="#1C1C1F" Foreground="#888888" BorderThickness="1" BorderBrush="#2D2D30" Padding="5,0" VerticalContentAlignment="Center" IsReadOnly="True" Cursor="Hand" MouseDoubleClick="BackupPathInput_MouseDoubleClick"/>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
