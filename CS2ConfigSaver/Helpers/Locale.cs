@@ -40,6 +40,7 @@
         public string Save { get; set; } = "";
         public string GamePathNotFound { get; set; } = "";
         public string NotificationFormat { get; set; } = "";
+        public string HelpBtn { get; set; } = "";
 
         /// <summary>
         /// Словари локализации
@@ -79,7 +80,8 @@
                 OnlyLetters = "Only RU/EN letters",
                 Save = "Save",
                 GamePathNotFound = "Counter-Strike 2 is not running.",
-                NotificationFormat = "Command \"{0}\" copied to clipboard!"
+                NotificationFormat = "Command \"{0}\" copied to clipboard!",
+                HelpBtn = "Config saver helper!"
             },
             // 1: RU
             new Locale {
@@ -114,7 +116,8 @@
                 OnlyLetters = "Только буквы RU/EN",
                 Save = "Сохранить",
                 GamePathNotFound = "Counter-Strike 2 не запущена.",
-                NotificationFormat = "Команда \"{0}\" скопирована в буфер!"
+                NotificationFormat = "Команда \"{0}\" скопирована в буфер!",
+                HelpBtn = "Помощник сохранения конфига!"
             },
             // 2: DE
             new Locale {
@@ -149,7 +152,8 @@
                 OnlyLetters = "Nur RU/EN Buchstaben",
                 Save = "Speichern",
                 GamePathNotFound = "Counter-Strike 2 läuft nicht.",
-                NotificationFormat = "Befehl \"{0}\" in die Zwischenablage kopiert!"
+                NotificationFormat = "Befehl \"{0}\" in die Zwischenablage kopiert!", 
+                HelpBtn = "Konfigurations saver helfer!"
             },
             // 3: FR
             new Locale {
@@ -184,7 +188,8 @@
                 OnlyLetters = "Lettres RU/EN uniquement",
                 Save = "Sauvegarder",
                 GamePathNotFound = "Counter-Strike 2 n'est pas lancé.",
-                NotificationFormat = "Commande \"{0}\" copiée dans le presse-papiers !"
+                NotificationFormat = "Commande \"{0}\" copiée dans le presse-papiers !",
+                HelpBtn = "Assistant de sauvegarde de configuration!"
             },
             // 4: ES
             new Locale {
@@ -219,7 +224,8 @@
                 OnlyLetters = "Solo letras RU/EN",
                 Save = "Guardar",
                 GamePathNotFound = "Counter-Strike 2 no se está ejecutando.",
-                NotificationFormat = "¡Comando \"{0}\" copiado al portapapeles!"
+                NotificationFormat = "¡Comando \"{0}\" copiado al portapapeles!",
+                HelpBtn = "Ayudante de guardado de configuración!"
             }
         };
     }

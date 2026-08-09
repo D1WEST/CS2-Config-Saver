@@ -121,6 +121,7 @@ namespace CS2ConfigSaver
             BackBtn2.Content = loc.Back;
 
             BackupFolderTitle.Text = loc.BackupFolderLabel;
+            HelpBtn.Content = loc.HelpBtn;
 
             UpdateSteamStatusText();
 

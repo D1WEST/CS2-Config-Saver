@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace CS2ConfigSaver.Helpers
+﻿namespace CS2ConfigSaver.Helpers
 {
     public static class AppPaths
     {
