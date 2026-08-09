@@ -42,7 +42,6 @@ namespace CS2ConfigSaver
         // Флаг, предотвращающий закрытие окон при открытии диалоговых окон выбора файлов/папок
         public bool IsDialogOpen { get; set; } = false;
 
-        public static readonly string[] LanguageTags = { "🇺🇸 EN", "🇷🇺 RU", "🇩🇪 DE", "🇫🇷 FR", "🇪🇸 ES" };
         private int _currentLanguageIndex = 0;
         private readonly string _langConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lang.txt");
 
@@ -96,21 +95,11 @@ namespace CS2ConfigSaver
             var loc = CurrentLocale;
             AppTitleText.Text = loc.Title;
 
-            // Массивы ресурсов флагов и текстовых меток
-            string[] flagPaths = {
-                "pack://application:,,,/Resources/Flags/en.png",
-                "pack://application:,,,/Resources/Flags/ru.png",
-                "pack://application:,,,/Resources/Flags/de.png",
-                "pack://application:,,,/Resources/Flags/fr.png",
-                "pack://application:,,,/Resources/Flags/es.png"
-            };
-            string[] langNames = { "EN", "RU", "DE", "FR", "ES" };
-
             try
             {
                 // Динамически загружаем картинку флага и меняем текст в кнопке
-                LangFlagImage.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(flagPaths[_currentLanguageIndex]));
-                LangText.Text = langNames[_currentLanguageIndex];
+                LangFlagImage.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(Flags.FlagPaths[_currentLanguageIndex]));
+                LangText.Text = Flags.LangNames[_currentLanguageIndex];
             }
             catch (Exception ex)
             {
@@ -187,7 +176,7 @@ namespace CS2ConfigSaver
         private void AutoDetectSteam(bool manualSearchIfFailed = false)
         {
             string? steamPath = null;
-            using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam"))
+            using (var key = Registry.CurrentUser.OpenSubKey(AppPaths.FindSteamUserSubKey))
             {
                 if (key != null)
                 {
@@ -201,10 +190,9 @@ namespace CS2ConfigSaver
 
             if (string.IsNullOrEmpty(steamPath) || !Directory.Exists(steamPath))
             {
-                string defaultPath = @"C:\Program Files (x86)\Steam";
-                if (Directory.Exists(defaultPath))
+                if (Directory.Exists(AppPaths.DefaultSteamPath))
                 {
-                    steamPath = defaultPath;
+                    steamPath = AppPaths.DefaultSteamPath;
                 }
             }
 
@@ -364,15 +352,15 @@ namespace CS2ConfigSaver
 
             try
             {
-                string machineConvarsPath = Path.Combine(_selectedSteamIdPath, "cs2_machine_convars.vcfg");
+                string machineConvarsPath = Path.Combine(_selectedSteamIdPath, AppPaths.MachineConvarsFile);
 
-                string userConvarsPath = Path.Combine(_selectedSteamIdPath, "cs2_user_convars_0_slot0.vcfg");
+                string userConvarsPath = Path.Combine(_selectedSteamIdPath, AppPaths.UserConvarsFile);
                 if (!File.Exists(userConvarsPath))
-                    userConvarsPath = Path.Combine(_selectedSteamIdPath, "cs2_user_convars.vcfg");
+                    userConvarsPath = Path.Combine(_selectedSteamIdPath, AppPaths.UserConvarsFileAlt);
 
-                string userKeysPath = Path.Combine(_selectedSteamIdPath, "cs2_user_keys_0_slot0.vcfg");
+                string userKeysPath = Path.Combine(_selectedSteamIdPath, AppPaths.UserKeysFile);
                 if (!File.Exists(userKeysPath))
-                    userKeysPath = Path.Combine(_selectedSteamIdPath, "cs2_user_keys.vcfg");
+                    userKeysPath = Path.Combine(_selectedSteamIdPath, AppPaths.UserKeysFileAlt);
 
                 if (!File.Exists(machineConvarsPath) && !File.Exists(userConvarsPath) && !File.Exists(userKeysPath))
                 {
@@ -505,7 +493,7 @@ namespace CS2ConfigSaver
                 return false;
             }
 
-            string cs2ConfigFolder = Path.Combine(_detectedSteamPath, @"steamapps\common\Counter-Strike Global Offensive\game\csgo\cfg");
+            string cs2ConfigFolder = Path.Combine(_detectedSteamPath, AppPaths.SteamConfigInjectionFolder);
 
             if (!Directory.Exists(cs2ConfigFolder))
             {
@@ -674,9 +662,9 @@ namespace CS2ConfigSaver
         {
             if (string.IsNullOrEmpty(_selectedSteamIdPath)) return "`";
 
-            string userKeysPath = Path.Combine(_selectedSteamIdPath, "cs2_user_keys_0_slot0.vcfg");
+            string userKeysPath = Path.Combine(_selectedSteamIdPath, AppPaths.UserKeysFile);
             if (!File.Exists(userKeysPath))
-                userKeysPath = Path.Combine(_selectedSteamIdPath, "cs2_user_keys.vcfg");
+                userKeysPath = Path.Combine(_selectedSteamIdPath, AppPaths.UserKeysFileAlt);
 
             if (File.Exists(userKeysPath))
             {
