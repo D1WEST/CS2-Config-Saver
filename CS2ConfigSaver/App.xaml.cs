@@ -47,6 +47,9 @@
 
                 _notifyIcon.Visible = true;
                 _notifyIcon.MouseClick += NotifyIcon_MouseClick;
+
+                // Показываем приложение при запуске
+                ToggleWindow();
             }
             catch (Exception ex)
             {

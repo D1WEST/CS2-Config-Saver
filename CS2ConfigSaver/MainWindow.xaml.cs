@@ -1,6 +1,7 @@
 ﻿using Microsoft.Win32;
 using System;
 using System.IO;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -17,6 +18,14 @@ using MessageBox = System.Windows.MessageBox;
 
 namespace CS2ConfigSaver
 {
+    public enum NotificationType
+    {
+        Success,
+        Error,
+        Warning,
+        Info
+    }
+
     public partial class MainWindow : Window
     {
         #region ПОЛЯ И ИНИЦИАЛИЗАЦИЯ
@@ -36,6 +45,7 @@ namespace CS2ConfigSaver
         private string? _detectedSteamPath;
         private string? _selectedSteamIdPath;
         private string _backupFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ConfigSaverBackups");
+        private readonly string _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CS2ConfigSaver.log");
 
         private HelpWindow? _helpWindow;
 
@@ -52,6 +62,7 @@ namespace CS2ConfigSaver
             try
             {
                 InitializeComponent();
+                LogOperation("Application started.", NotificationType.Info);
                 LoadSavedLanguage();
                 ApplyLocalization();
                 BackupPathInput.Text = _backupFolderPath;
@@ -59,12 +70,38 @@ namespace CS2ConfigSaver
             }
             catch (Exception ex)
             {
+                LogOperation("Initialization failed.", NotificationType.Error, ex);
                 MessageBox.Show($"Window Init Error:\n{ex}", "Crash Protection", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         #endregion
 
-        #region СИСТЕМА ЛОКАЛИЗАЦИИ
+        #region СИСТЕМА ЛОКАЛИЗАЦИИ И СЕРВИСЫ УВЕДОМЛЕНИЙ
+        private void LogOperation(string message, NotificationType type, Exception? ex = null)
+        {
+            try
+            {
+                string status = type.ToString().ToUpper();
+                string errDetails = ex != null ? $" | Exception: {ex.Message}\n{ex.StackTrace}" : "";
+                string logLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{status}] {message}{errDetails}{Environment.NewLine}";
+                File.AppendAllText(_logFilePath, logLine, Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        public void TriggerToast(string message, NotificationType type)
+        {
+            try
+            {
+                NotificationWindow toast = new NotificationWindow(message, type, this);
+                toast.Show();
+            }
+            catch (Exception ex)
+            {
+                LogOperation("Failed to trigger toast notification.", NotificationType.Error, ex);
+            }
+        }
+
         public void LoadSavedLanguage()
         {
             try
@@ -97,7 +134,6 @@ namespace CS2ConfigSaver
 
             try
             {
-                // Динамически загружаем картинку флага и меняем текст в кнопке
                 LangFlagImage.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(Flags.FlagPaths[_currentLanguageIndex]));
                 LangText.Text = Flags.LangNames[_currentLanguageIndex];
             }
@@ -136,6 +172,7 @@ namespace CS2ConfigSaver
             _currentLanguageIndex = (_currentLanguageIndex + 1) % Locale.Locales.Length;
             SaveLanguageSettings();
             ApplyLocalization();
+            LogOperation($"Language changed to Index {_currentLanguageIndex} ({CurrentLocale.Title})", NotificationType.Info);
         }
 
         private void UpdateSteamStatusText()
@@ -168,9 +205,10 @@ namespace CS2ConfigSaver
         }
         #endregion
 
-        #region ПОИСК И НАСТРОЙКА STEAM ПАПОК
+        #region ПОИСК И НАСТРОЙКА STEAM ПАПОК И ДЕТЕКТ КЛИЕНТОВ
         public void FindSteamFolders_Click(object sender, RoutedEventArgs e)
         {
+            LogOperation("Manual Steam folder search triggered.", NotificationType.Info);
             AutoDetectSteam(manualSearchIfFailed: true);
         }
 
@@ -200,10 +238,12 @@ namespace CS2ConfigSaver
             if (!string.IsNullOrEmpty(steamPath) && Directory.Exists(steamPath))
             {
                 _detectedSteamPath = steamPath;
+                LogOperation($"Steam path resolved: {_detectedSteamPath}", NotificationType.Info);
                 AnalyzeUserdata();
             }
             else
             {
+                LogOperation("Steam path auto-detection failed.", NotificationType.Warning);
                 if (manualSearchIfFailed)
                 {
                     ManualSelectSteamFolder();
@@ -215,6 +255,65 @@ namespace CS2ConfigSaver
             }
         }
 
+        private uint GetActiveSteamRegistryUserId()
+        {
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam\ActiveProcess"))
+                {
+                    if (key != null)
+                    {
+                        object? activeUserValue = key.GetValue("ActiveUser");
+                        if (activeUserValue != null && activeUserValue is int integerValue)
+                        {
+                            return (uint)integerValue;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogOperation("Could not read Active Registry Steam User ID.", NotificationType.Warning, ex);
+            }
+            return 0;
+        }
+
+        private Dictionary<string, (string PersonaName, string AccountName)> ParseSteamLoginUsers()
+        {
+            var dict = new Dictionary<string, (string PersonaName, string AccountName)>();
+            if (string.IsNullOrEmpty(_detectedSteamPath)) return dict;
+
+            string loginUsersFile = Path.Combine(_detectedSteamPath, "config", "loginusers.vdf");
+            if (!File.Exists(loginUsersFile)) return dict;
+
+            try
+            {
+                string content = File.ReadAllText(loginUsersFile);
+                var blocks = Regex.Matches(content, @"""(7656119\d{10})""\s*\{([^}]+)\}", RegexOptions.Singleline);
+                foreach (Match match in blocks)
+                {
+                    string steamId64 = match.Groups[1].Value;
+                    string blockBody = match.Groups[2].Value;
+
+                    string personaName = "";
+                    string accountName = "";
+
+                    var personaMatch = Regex.Match(blockBody, @"""PersonaName""\s+""([^""]+)""", RegexOptions.IgnoreCase);
+                    if (personaMatch.Success) personaName = personaMatch.Groups[1].Value;
+
+                    var accountMatch = Regex.Match(blockBody, @"""AccountName""\s+""([^""]+)""", RegexOptions.IgnoreCase);
+                    if (accountMatch.Success) accountName = accountMatch.Groups[1].Value;
+
+                    dict[steamId64] = (personaName, accountName);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogOperation("Error parsing Steam config loginusers.vdf", NotificationType.Warning, ex);
+            }
+            return dict;
+        }
+
         private void AnalyzeUserdata()
         {
             if (string.IsNullOrEmpty(_detectedSteamPath)) return;
@@ -222,7 +321,10 @@ namespace CS2ConfigSaver
             string userdataPath = Path.Combine(_detectedSteamPath, "userdata");
             if (!Directory.Exists(userdataPath))
             {
-                SteamStatusText.Text = "Folder 'userdata' not found inside Steam.";
+                string msg = "Folder 'userdata' not found inside Steam.";
+                LogOperation(msg, NotificationType.Error);
+                SteamStatusText.Text = msg;
+                TriggerToast(msg, NotificationType.Error);
                 return;
             }
 
@@ -233,23 +335,66 @@ namespace CS2ConfigSaver
 
             if (userDirs.Count == 0)
             {
-                SteamStatusText.Text = "No active steam profiles found in userdata.";
+                string msg = "No active steam profiles found in userdata.";
+                LogOperation(msg, NotificationType.Warning);
+                SteamStatusText.Text = msg;
+                TriggerToast(msg, NotificationType.Info);
             }
             else if (userDirs.Count == 1)
             {
                 SetSteamId(userDirs[0]);
+                LogOperation($"Single Steam profile detected and selected automatically: {userDirs[0]}", NotificationType.Success);
             }
             else
             {
+                LogOperation($"Multiple steam accounts found: {userDirs.Count} directories.", NotificationType.Info);
                 SteamIdsContainer.Children.Clear();
-                foreach (var id in userDirs)
+
+                uint registryActiveUser32 = GetActiveSteamRegistryUserId();
+                var resolvedAccountData = ParseSteamLoginUsers();
+
+                foreach (var id32Str in userDirs)
                 {
+                    bool isActiveAccount = false;
+                    string displayAccountLabel = $"ID: {id32Str}";
+
+                    if (uint.TryParse(id32Str, out uint numericId32))
+                    {
+                        if (registryActiveUser32 != 0 && numericId32 == registryActiveUser32)
+                        {
+                            isActiveAccount = true;
+                        }
+
+                        // Convert 32-bit ID to 64-bit ID
+                        long steamId64 = 76561197960265728L + numericId32;
+                        string key64 = steamId64.ToString();
+
+                        if (resolvedAccountData.ContainsKey(key64))
+                        {
+                            var details = resolvedAccountData[key64];
+                            displayAccountLabel = $"{details.PersonaName} ({details.AccountName}) - ID: {id32Str}";
+                        }
+                    }
+
+                    if (isActiveAccount)
+                    {
+                        displayAccountLabel += " [Current active account]";
+                    }
+
                     Button btn = new Button
                     {
-                        Content = $"Steam ID: {id}",
+                        Content = displayAccountLabel,
                         Style = (Style)FindResource("MenuButtonStyle"),
-                        Tag = id
+                        Tag = id32Str
                     };
+
+                    if (isActiveAccount)
+                    {
+                        btn.BorderBrush = System.Windows.Media.Brushes.LimeGreen;
+                        btn.BorderThickness = new Thickness(1.5);
+                        btn.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 60, 25));
+                    }
+
                     btn.Click += SteamIdSelect_Click;
                     SteamIdsContainer.Children.Add(btn);
                 }
@@ -272,6 +417,7 @@ namespace CS2ConfigSaver
             if (sender is Button btn && btn.Tag is string id)
             {
                 SetSteamId(id);
+                LogOperation($"Steam account manually selected: {id}", NotificationType.Success);
                 ShowScreen(MainMenuGrid);
             }
         }
@@ -300,10 +446,12 @@ namespace CS2ConfigSaver
                         {
                             _selectedSteamIdPath = dialog.SelectedPath;
                             SteamStatusText.Text = "Manual path: ...\\730\\local\\cfg";
+                            LogOperation($"Steam manual path directly bound to cfg: {_selectedSteamIdPath}", NotificationType.Success);
                         }
                         else
                         {
                             _detectedSteamPath = dialog.SelectedPath;
+                            LogOperation($"Steam manual root path specified: {_detectedSteamPath}", NotificationType.Info);
                             AnalyzeUserdata();
                         }
                         ShowScreen(MainMenuGrid);
@@ -322,7 +470,10 @@ namespace CS2ConfigSaver
         {
             if (string.IsNullOrEmpty(_selectedSteamIdPath) || !Directory.Exists(_selectedSteamIdPath))
             {
-                MessageBox.Show(CurrentLocale.SteamNotFound, "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                string errMsg = CurrentLocale.SteamNotFound;
+                LogOperation("Attempted to initiate save config without loaded Steam profile folder.", NotificationType.Warning);
+                MessageBox.Show(errMsg, "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TriggerToast(errMsg, NotificationType.Error);
                 return;
             }
 
@@ -365,7 +516,10 @@ namespace CS2ConfigSaver
 
                 if (!File.Exists(machineConvarsPath) && !File.Exists(userConvarsPath) && !File.Exists(userKeysPath))
                 {
-                    MessageBox.Show("Required .vcfg files were not found.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    string vcfgMissingText = "Required .vcfg config files were not found.";
+                    LogOperation($"Failed to backup configurations: .vcfg missing in {_selectedSteamIdPath}", NotificationType.Error);
+                    MessageBox.Show(vcfgMissingText, "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    TriggerToast(vcfgMissingText, NotificationType.Error);
                     return;
                 }
 
@@ -405,13 +559,18 @@ namespace CS2ConfigSaver
                 string mergedConfigPath = Path.Combine(targetDirectory, $"{configName}.cfg");
                 File.WriteAllText(mergedConfigPath, mergedContent.ToString(), Encoding.UTF8);
 
-                MessageBox.Show($"{CurrentLocale.CopySuccess}\n\nPath: {mergedConfigPath}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                string successMessage = $"{CurrentLocale.CopySuccess}\n\nPath: {mergedConfigPath}";
+                LogOperation($"Config saved successfully: {mergedConfigPath}", NotificationType.Success);
+                MessageBox.Show(successMessage, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                TriggerToast("Config Saved Successfully!", NotificationType.Success);
 
                 ShowScreen(MainMenuGrid);
             }
             catch (Exception ex)
             {
+                LogOperation("Error saving configuration.", NotificationType.Error, ex);
                 MessageBox.Show($"An error occurred during save: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                TriggerToast("Error saving configuration!", NotificationType.Error);
             }
         }
 
@@ -490,7 +649,10 @@ namespace CS2ConfigSaver
         {
             if (string.IsNullOrEmpty(_detectedSteamPath) || !Directory.Exists(_detectedSteamPath))
             {
-                MessageBox.Show(CurrentLocale.SteamNotFound, "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                string noSteamText = CurrentLocale.SteamNotFound;
+                LogOperation("Attempted importing configuration without detected Steam folder path.", NotificationType.Warning);
+                MessageBox.Show(noSteamText, "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TriggerToast(noSteamText, NotificationType.Error);
                 return false;
             }
 
@@ -498,7 +660,10 @@ namespace CS2ConfigSaver
 
             if (!Directory.Exists(cs2ConfigFolder))
             {
-                MessageBox.Show(CurrentLocale.GamePathNotFound + $"\nExpected path:\n{cs2ConfigFolder}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                string pathNotFoundMsg = CurrentLocale.GamePathNotFound + $"\nExpected path:\n{cs2ConfigFolder}";
+                LogOperation($"CS2 CFG folder path not found: {cs2ConfigFolder}", NotificationType.Error);
+                MessageBox.Show(pathNotFoundMsg, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                TriggerToast("CS2 Folder Not Found!", NotificationType.Error);
                 return false;
             }
 
@@ -536,15 +701,17 @@ namespace CS2ConfigSaver
                     Clipboard.SetText(execCommand);
 
                     string notificationMsg = string.Format(CurrentLocale.NotificationFormat, execCommand);
-                    NotificationWindow toast = new NotificationWindow(notificationMsg, this);
-                    toast.Show();
+                    TriggerToast(notificationMsg, NotificationType.Success);
+                    LogOperation($"Successfully copied config file {sourceFile} into {destFile}. Copied command: '{execCommand}'", NotificationType.Success);
 
                     await SendCommandToCS2Async(execCommand, runBtn);
                     return true;
                 }
                 catch (Exception ex)
                 {
+                    LogOperation("Error copying config file to CS2 folder.", NotificationType.Error, ex);
                     MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    TriggerToast("Failed copying config to CS2!", NotificationType.Error);
                 }
             }
             return false;
@@ -559,7 +726,10 @@ namespace CS2ConfigSaver
             var processes = System.Diagnostics.Process.GetProcessesByName("cs2");
             if (processes.Length == 0)
             {
-                MessageBox.Show(CurrentLocale.GamePathNotFound, "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                string notRunningMsg = CurrentLocale.GamePathNotFound;
+                LogOperation("CS2 is not running. Could not inject commands automatically.", NotificationType.Warning);
+                MessageBox.Show(notRunningMsg, "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TriggerToast("Counter-Strike 2 is offline!", NotificationType.Info);
                 return false;
             }
 
@@ -588,9 +758,11 @@ namespace CS2ConfigSaver
 
                 // 2. Вставляем текст и нажимаем Enter
                 SendPasteAndEnterHardware();
+                LogOperation($"Hardware console key emulation sent to CS2 process.", NotificationType.Success);
             }
             catch (Exception ex)
             {
+                LogOperation("Failed hardware input simulation.", NotificationType.Error, ex);
                 System.Diagnostics.Debug.WriteLine($"Hardware input error: {ex.Message}");
             }
 
@@ -629,7 +801,6 @@ namespace CS2ConfigSaver
                     break;
             }
 
-            // Увеличили удержание клавиши консоли до 100 мс для стабильного считывания игрой
             keybd_event(vk, 0, 0, 0);
             System.Threading.Thread.Sleep(100);
             keybd_event(vk, 0, KEYEVENTF_KEYUP, 0);
@@ -715,11 +886,19 @@ namespace CS2ConfigSaver
         #region ДРУГИЕ ДЕЙСТВИЯ
         private void LocateConfigs_Click(object sender, RoutedEventArgs e)
         {
-            if (!Directory.Exists(_backupFolderPath))
+            try
             {
-                Directory.CreateDirectory(_backupFolderPath);
+                if (!Directory.Exists(_backupFolderPath))
+                {
+                    Directory.CreateDirectory(_backupFolderPath);
+                }
+                System.Diagnostics.Process.Start("explorer.exe", _backupFolderPath);
+                LogOperation($"Opened backups folder directory in Explorer: {_backupFolderPath}", NotificationType.Info);
             }
-            System.Diagnostics.Process.Start("explorer.exe", _backupFolderPath);
+            catch (Exception ex)
+            {
+                LogOperation("Could not open backups folder in Explorer.", NotificationType.Warning, ex);
+            }
         }
 
         public void BackupPathInput_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -734,6 +913,7 @@ namespace CS2ConfigSaver
                     {
                         _backupFolderPath = dialog.SelectedPath;
                         BackupPathInput.Text = _backupFolderPath;
+                        LogOperation($"Backup folder location successfully changed manually: {_backupFolderPath}", NotificationType.Success);
                     }
                 }
             }
@@ -757,6 +937,7 @@ namespace CS2ConfigSaver
                     double helpWidth = _helpWindow.ActualWidth > 0 ? _helpWindow.ActualWidth : 430;
                     _helpWindow.Left = this.Left - helpWidth - 10;
                     _helpWindow.Top = this.Top;
+                    LogOperation("Help window overlay opened.", NotificationType.Info);
                 }
                 else
                 {
@@ -765,12 +946,14 @@ namespace CS2ConfigSaver
             }
             catch (Exception ex)
             {
+                LogOperation("Error opening Help window.", NotificationType.Error, ex);
                 MessageBox.Show($"Error opening Help Window:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
+            LogOperation("Application exit sequence requested.", NotificationType.Info);
             Application.Current.Shutdown();
         }
 

@@ -152,7 +152,7 @@
                 OnlyLetters = "Nur RU/EN Buchstaben",
                 Save = "Speichern",
                 GamePathNotFound = "Counter-Strike 2 läuft nicht.",
-                NotificationFormat = "Befehl \"{0}\" in die Zwischenablage kopiert!", 
+                NotificationFormat = "Befehl \"{0}\" in die Zwischenablage kopiert!",
                 HelpBtn = "Konfigurations saver helfer!"
             },
             // 3: FR

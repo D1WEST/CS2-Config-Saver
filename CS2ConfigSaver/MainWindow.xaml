@@ -11,7 +11,6 @@
         Deactivated="Window_Deactivated"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
 
-    <!-- Добавляем этот блок для удаления системных рамок без багов прозрачности -->
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" 
                       ResizeBorderThickness="5" 
@@ -20,31 +19,60 @@
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <!-- Стили для кнопок -->
+        <!-- Стили для кнопок с динамическими эффектами наведения и нажатия -->
         <Style x:Key="MenuButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#252548"/>
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#2D2D30"/>
             <Setter Property="Height" Value="38"/>
             <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <!-- Основной контейнер кнопки (добавляем RenderTransformOrigin для центрирования при нажатии) -->
+                        <Border x:Name="BtnBorder" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Grid>
+                                <!-- Слой наведения (светлее) -->
+                                <Border x:Name="HoverOverlay" Background="#FFFFFF" Opacity="0" CornerRadius="5"/>
+                                <!-- Слой нажатия (темнее) -->
+                                <Border x:Name="PressedOverlay" Background="#000000" Opacity="0" CornerRadius="5"/>
+                                <!-- Текст кнопки -->
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,2"/>
+                            </Grid>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Наведение мыши -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HoverOverlay" Property="Opacity" Value="0.12"/>
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="#00FF66"/>
+                            </Trigger>
+                            <!-- Нажатие (Корректно применяем ScaleTransform к свойству RenderTransform родительского Border) -->
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="PressedOverlay" Property="Opacity" Value="0.2"/>
+                                <Setter TargetName="BtnBorder" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.97" ScaleY="0.97"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <!-- Деактивация кнопки -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#1F1F21"/>
+                                <Setter Property="Foreground" Value="#555555"/>
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="#171719"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#323236"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#1F1F21"/>
-                    <Setter Property="Foreground" Value="#555555"/>
-                </Trigger>
-            </Style.Triggers>
         </Style>
     </Window.Resources>
 
@@ -59,7 +87,7 @@
                 <!-- Подвал (Путь сохранения) -->
             </Grid.RowDefinitions>
 
-            <!-- ШАПКА (Перестроена на вертикальный StackPanel) -->
+            <!-- ШАПКА -->
             <StackPanel Grid.Row="0" Margin="0,0,0,15">
                 <!-- 1. Название программы (сверху по центру) -->
                 <TextBlock x:Name="AppTitleText" 
@@ -80,7 +108,7 @@
                         </StackPanel>
                     </Button>
 
-                    <!-- Кнопка помощи (добавлены внутренние отступы Padding для корректного отображения длинного текста) -->
+                    <!-- Кнопка помощи -->
                     <Button x:Name="HelpBtn" 
                             Content="Config saver helper?" 
                             Height="26" 
@@ -114,7 +142,7 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <TextBlock x:Name="SelectSteamIdTitle" Grid.Row="0" Text="Select Steam ID:" Foreground="White" Margin="0,0,0,10"/>
+                <TextBlock x:Name="SelectSteamIdTitle" Grid.Row="0" Text="Select Steam ID:" Foreground="White" Margin="0,0,0,10" FontSize="13" FontWeight="Bold"/>
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel x:Name="SteamIdsContainer"/>
                 </ScrollViewer>
